@@ -72,6 +72,29 @@ class MemoryManager:
 
             return input_id
 
+    def add_question(self, text, intent=None):
+        """Store a question in the graph."""
+        try:
+            with self.driver.session() as session:
+                result = session.run(
+                    """
+                    MATCH (c:Content {id: $content_id})
+                    MATCH (p:Phase {id: $phase_id})
+                    CREATE (q:Question {id: randomUUID(), text: $text, intent: $intent, timestamp: datetime()})
+                    CREATE (c)-[:HAS_QUESTION]->(q)
+                    CREATE (p)-[:ASKED]->(q)
+                    RETURN q.id as question_id
+                    """,
+                    content_id=self.session_id,
+                    phase_id=self.current_phase_id,
+                    text=text,
+                    intent=intent,
+                )
+                return result.single()["question_id"]
+        except Exception as e:
+            self.logger.error(f"Failed to add question '{text}': {e}")
+            raise
+
     def add_section(self, title):
         """Add a content section."""
         with self.driver.session() as session:

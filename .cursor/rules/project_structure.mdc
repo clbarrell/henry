@@ -1,0 +1,109 @@
+---
+description: Maintains consistent project structure and import patterns
+globs: *.py
+alwaysApply: false
+---
+name: project_structure_patterns
+description: Maintains consistent project structure and import patterns
+
+filters:
+  - type: file_path
+    pattern: "src/.*\\.py$|main\\.py$"
+
+actions:
+  - type: lint
+    message: "Follow consistent import and module organization patterns"
+    conditions:
+      - pattern: "from\\s+src\\."
+        positive: true
+        message: "Use relative imports within the src package"
+        
+      - pattern: "import\\s+logging"
+        positive: true
+        message: "Configure logging for all modules"
+
+  - type: suggest
+    conditions:
+      - pattern: "^import|^from"
+    message: |
+      Follow these project structure guidelines:
+      
+      1. Import organization pattern:
+         ```python
+         # Standard library imports
+         import logging
+         import json
+         from typing import Dict, List, Optional
+         
+         # Third-party imports
+         import neo4j
+         import pytest
+         import anthropic
+         
+         # Local imports
+         from src.memory.graph_db import MemoryManager
+         from src.engine.phase import PhaseController
+         from src.llm import LLMClient, AgentState, PromptManager
+         ```
+      
+      2. Module responsibility separation:
+         - `memory/`: Database and persistence
+         - `engine/`: Core business logic
+         - `interface/`: User interaction
+         - `utils/`: Shared utilities
+         - `llm/`: LLM logic, agent and prompts
+         - `prompts/`: Prompt templates for LLM
+        
+      
+      3. Configuration management:
+         - Use environment variables for sensitive information (API keys, database credentials)
+         - Use environment variables for feature flags (USE_LLM)
+         - Load configuration from files for non-sensitive settings
+         
+      4. Documentation standards:
+         - Include docstrings for all classes and methods
+         - Use type hints for function parameters and return values
+         - Document LLM-specific behavior and fallbacks
+
+examples:
+  - input: |
+      import random
+      from src.memory.graph_db import MemoryManager
+      
+      def process_data(data):
+          # Process data
+          memory = MemoryManager()
+          return memory.store(data)
+    output: |
+      import logging
+      import random
+      from typing import Dict, Any
+      
+      from src.memory.graph_db import MemoryManager
+      
+      logger = logging.getLogger(__name__)
+      
+      def process_data(data: Dict[str, Any]) -> str:
+          """Process and store data in the memory manager.
+          
+          Args:
+              data: Dictionary containing data to process
+              
+          Returns:
+              The ID of the stored data
+              
+          Raises:
+              ValueError: If data is invalid
+          """
+          logger.info(f"Processing data: {data.keys()}")
+          
+          try:
+              memory = MemoryManager()
+              return memory.store(data)
+          except Exception as e:
+              logger.error(f"Failed to process data: {e}")
+              raise
+
+metadata:
+  priority: medium
+  version: 1.1

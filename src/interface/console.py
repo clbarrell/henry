@@ -1,57 +1,76 @@
 # src/interface/console.py
 import logging
+from rich.console import Console
+from rich.prompt import Prompt
+import questionary
+from questionary import Style as QuestionaryStyle
 
 
 class ConsoleInterface:
-    """Simple text-based console interface for the content creation agent."""
+    """Rich text-based console interface for the content creation agent."""
 
     def __init__(self, interaction_engine):
         """Initialize with an interaction engine."""
         self.interaction = interaction_engine
         self.logger = logging.getLogger(__name__)
         self.session_active = False
+        self.console = Console()
+
+        # Define custom styles for questionary
+        self.custom_style = QuestionaryStyle(
+            [
+                ("qmark", "fg:cyan bold"),
+                ("question", "fg:white bold"),
+                ("answer", "fg:green bold"),
+                ("pointer", "fg:cyan bold"),
+                ("highlighted", "fg:cyan bold"),
+                ("selected", "fg:green bold"),
+                ("separator", "fg:cyan"),
+                ("instruction", "fg:white"),
+                ("text", "fg:white"),
+                ("disabled", "fg:gray italic"),
+            ]
+        )
 
     def start(self):
         """Start the console interface."""
-        print("Welcome to the Content Creation AI Agent!")
-        print("Type 'exit' to quit at any time.")
+        self.console.print("[bold]Welcome to the Content Creation AI Agent![/bold]")
+        self.console.print("Type [italic]'exit'[/italic] to quit at any time.")
 
         while True:
             if not self.session_active:
                 self._setup_session()
 
-            user_input = input("\nYou: ").strip()
+            user_input = Prompt.ask("\n[bold cyan]You[/bold cyan]")
 
             if user_input.lower() == "exit":
-                print("Goodbye!")
+                self.console.print("[bold]Goodbye![/bold]")
                 break
 
             response = self.interaction.process_user_input(user_input)
-            print(f"\nAgent: {response}")
+            self.console.print(f"\n[bold green]Agent[/bold green]: {response}")
 
     def _setup_session(self):
         """Set up a new content creation session."""
-        print("\nLet's start a new content creation session.")
+        self.console.print("\n[bold]Let's start a new content creation session.[/bold]")
 
         content_types = ["blog_post", "twitter_thread", "linkedin_post"]
-        print("What type of content would you like to create?")
-        for i, content_type in enumerate(content_types, 1):
-            print(f"{i}. {content_type}")
 
-        while True:
-            try:
-                choice = int(input("Enter the number of your choice: "))
-                if 1 <= choice <= len(content_types):
-                    content_type = content_types[choice - 1]
-                    break
-                else:
-                    print("Invalid choice. Please try again.")
-            except ValueError:
-                print("Please enter a number.")
+        # Use questionary for content type selection
+        content_type = questionary.select(
+            "What type of content would you like to create?",
+            choices=content_types,
+            style=self.custom_style,
+        ).ask()
 
-        topic = input("What's the main topic of your content? ")
+        if not content_type:  # Handle case where user cancels
+            content_type = "blog_post"  # Default
+
+        topic = Prompt.ask(
+            "[bold cyan]What's the main topic of your content?[/bold cyan]"
+        )
 
         welcome_message = self.interaction.start_session(content_type, topic)
-        print(f"\nAgent: {welcome_message}")
+        self.console.print(f"\n[bold green]Agent[/bold green]: {welcome_message}")
 
         self.session_active = True

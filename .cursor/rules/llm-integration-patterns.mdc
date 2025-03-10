@@ -1,0 +1,86 @@
+---
+description: Ensures consistent patterns when working with LLM integration
+globs: src/llm/*.py, src/engine/interaction.py
+alwaysApply: false
+---
+
+<rule>
+name: llm_integration_patterns
+description: Ensures consistent patterns when working with LLM integration
+
+filters:
+  - type: file_path
+    pattern: "src/llm/.*\\.py$|src/engine/interaction\\.py$"
+
+actions:
+  - type: lint
+    message: "Follow consistent patterns for LLM integration"
+    conditions:
+      - pattern: "try:.*?except\\s+Exception.*?:"
+        positive: true
+        message: "Always use try-except when calling LLM APIs to handle failures gracefully"
+      
+      - pattern: "self\\.logger\\.(?:error|warning|info|debug)\\("
+        positive: true
+        message: "Use proper logging for LLM operations"
+
+  - type: suggest
+    conditions:
+      - pattern: "(?:LLMClient|AgentState|PromptManager)"
+    message: |
+      When working with LLM integration:
+      
+      1. Error Handling:
+         ```python
+         try:
+             response = self.llm_client.generate_response(...)
+         except Exception as e:
+             self.logger.error(f"Error generating response: {e}")
+             # Fall back to a default behavior
+             return default_response
+         ```
+      
+      2. Prompt Management:
+         - Store prompts in external files when possible
+         - Use a consistent format for prompt templates
+         - Always provide default prompts as fallbacks
+      
+      3. Agent State:
+         - Keep track of conversation context
+         - Limit context to a reasonable number of messages
+         - Include save/load functionality for persistence
+      
+      4. Graceful Degradation:
+         - Always provide a fallback to simpler behavior if LLM fails
+         - Design the system to work without LLM if needed
+      
+      5. Environment Variables:
+         - Use environment variables for API keys
+         - Add a feature flag to enable/disable LLM features
+
+examples:
+  - input: |
+      def generate_question(self, conversation_context):
+          response = self.llm_client.generate_response(
+              messages=conversation_context,
+              system="Generate a question",
+              max_tokens=100
+          )
+          return response.content[0].text
+    output: |
+      def generate_question(self, conversation_context):
+          try:
+              response = self.llm_client.generate_response(
+                  messages=conversation_context,
+                  system="Generate a question",
+                  max_tokens=100
+              )
+              return response.content[0].text
+          except Exception as e:
+              self.logger.error(f"Error generating question: {e}")
+              return "Could you tell me more about your content?"
+
+metadata:
+  priority: high
+  version: 1.0
+</rule>

@@ -19,6 +19,7 @@ The agent maintains context throughout the conversation, asks relevant questions
 
 - Python 3.9 or higher
 - Neo4j Database (local installation or cloud instance)
+- Anthropic API key (for LLM-powered features)
 
 ### Setup
 
@@ -36,11 +37,20 @@ The agent maintains context throughout the conversation, asks relevant questions
    ```
 
 3. Configure Neo4j:
+
    - Install Neo4j Desktop from [neo4j.com/download](https://neo4j.com/download/)
    - Create a new database with a password
    - Update the Neo4j connection details in `main.py` if needed:
      ```python
      memory = MemoryManager(uri="bolt://localhost:7687", username="neo4j", password="your_password")
+     ```
+
+4. Configure LLM (optional but recommended):
+   - Get an API key from [Anthropic](https://console.anthropic.com/)
+   - Set environment variables:
+     ```bash
+     export ANTHROPIC_API_KEY=your_api_key
+     export USE_LLM=true
      ```
 
 ## Usage
@@ -73,6 +83,22 @@ The following commands are available during any content creation session:
 - **Phase-Based Guidance**: Different question strategies for each phase of content creation
 - **Contextual Understanding**: Analyzes your responses to ask relevant follow-up questions
 - **Command Interface**: Simple commands to control the application flow
+- **LLM Integration**: Uses Claude AI to provide intelligent guidance and analysis (when enabled)
+
+## LLM Integration
+
+The agent can operate in two modes:
+
+1. **Basic Mode**: Uses predefined questions and simple keyword matching (default)
+2. **LLM-Powered Mode**: Uses Claude AI to analyze responses and generate contextual questions
+
+When LLM mode is enabled:
+
+- Questions are dynamically generated based on your previous responses
+- Phase transitions are determined by AI analysis of your inputs
+- The agent maintains a more sophisticated understanding of your content goals
+
+To enable LLM mode, set the `USE_LLM` environment variable to `true` and provide your Anthropic API key.
 
 ## Project Structure
 
@@ -87,7 +113,14 @@ content_creation_agent/
 │   │   └── interaction.py   # Interaction engine
 │   ├── interface/           # User interaction
 │   │   └── console.py       # Console interface
+│   ├── llm/                 # LLM integration
+│   │   ├── client.py        # Anthropic API client
+│   │   ├── agent_state.py   # Agent state management
+│   │   └── prompt_manager.py # Prompt template management
 │   └── utils/               # Helper functions
+├── prompts/                 # Prompt templates
+│   ├── base.txt             # Base agent instructions
+│   └── phases/              # Phase-specific prompts
 └── tests/                   # Test suite
     ├── test_memory.py       # Memory tests
     └── test_interaction.py  # Interaction tests
@@ -109,6 +142,15 @@ This graph structure allows the agent to understand the relationships between di
 
 The phase controller manages transitions between the four phases of content creation and provides appropriate guidance for each phase.
 
+### LLM Integration
+
+The LLM integration uses Anthropic's Claude API to:
+
+- Analyze user inputs for intent and content
+- Generate contextual follow-up questions
+- Determine when to transition between phases
+- Provide more personalized guidance
+
 ### Testing
 
 Run the test suite with:
@@ -126,6 +168,7 @@ The tests verify the core functionality of the memory management system and inte
 - Templates for different content types and styles
 - Integration with SEO tools and content analyzers
 - Multi-modal content suggestions (images, video concepts)
+- Session persistence for resuming content creation later
 
 ## License
 
