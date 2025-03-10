@@ -1,0 +1,71 @@
+---
+description: Ensures proper patterns when interacting with Neo4j database
+globs: src/memory/.*\\.py$
+alwaysApply: false
+---
+actions:
+  - type: lint
+    message: "Always use parameterized Cypher queries and proper transaction handling with Neo4j"
+    conditions:
+      - pattern: "session\\.run\\(\"[^\"]*\\$(?!\\{)[^\"]*\"[^,]*\\)"
+        positive: true
+        message: "Use parameterized queries with $param_name pattern"
+
+      - pattern: "with\\s+self\\.driver\\.session\\(\\)\\s+as\\s+session:"
+        positive: true
+        message: "Always use context manager with Neo4j sessions"
+
+      - pattern: "\\.close\\(\\)"
+        positive: true
+        message: "Always close database connections in cleanup"
+
+  - type: suggest
+    conditions:
+      - pattern: "session\\.run\\(.*\\)"
+    message: |
+      When working with Neo4j:
+      1. Always use parameterized queries to prevent injection:
+         ```python
+         session.run(
+             "MATCH (c:Content {id: $content_id}) RETURN c",
+             content_id=content_id
+         )
+         ```
+      2. Always use context managers for sessions:
+         ```python
+         with self.driver.session() as session:
+             result = session.run(...)
+         ```
+      3. Include error handling for database operations:
+         ```python
+         try:
+             with self.driver.session() as session:
+                 result = session.run(...)
+         except neo4j.exceptions.Neo4jError as e:
+             self.logger.error(f"Database error: {e}")
+             raise
+         ```
+
+examples:
+  - input: |
+      def get_data(self):
+          session = self.driver.session()
+          result = session.run("MATCH (n) WHERE n.name = " + name + " RETURN n")
+          session.close()
+          return result
+    output: |
+      def get_data(self):
+          try:
+              with self.driver.session() as session:
+                  result = session.run(
+                      "MATCH (n) WHERE n.name = $name RETURN n",
+                      name=name
+                  )
+                  return result
+          except neo4j.exceptions.Neo4jError as e:
+              self.logger.error(f"Database error: {e}")
+              raise
+
+metadata:
+  priority: high
+  version: 1.0

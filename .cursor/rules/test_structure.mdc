@@ -1,0 +1,84 @@
+---
+description: Ensures consistent test structure and proper mocking
+globs: *test*.py
+alwaysApply: false
+---
+<rule>
+name: test_structure_patterns
+description: Ensures consistent test structure and proper mocking
+
+filters:
+  - type: file_path
+    pattern: "tests/.*\\.py$"
+
+actions:
+  - type: lint
+    message: "Follow consistent test structure with proper fixtures and mocking"
+    conditions:
+      - pattern: "@pytest\\.fixture"
+        positive: true
+        message: "Use pytest fixtures for test setup"
+        
+      - pattern: "def\\s+test_[a-z_]+\\("
+        positive: true
+        message: "Test method names should start with 'test_' and use snake_case"
+
+  - type: suggest
+    conditions:
+      - pattern: "(?:test|fixture)"
+    message: |
+      When writing tests:
+      1. Use pytest fixtures for shared setup:
+         ```python
+         @pytest.fixture
+         def memory_manager():
+             mm = MemoryManager(uri="memory://", username="test", password="test")
+             yield mm
+             mm.close()
+         ```
+      
+      2. Follow test method naming conventions:
+         - Always prefix with `test_`
+         - Use descriptive names: `test_phase_transition_updates_database`
+         - Use snake_case
+      
+      3. Mock external dependencies:
+         ```python
+         @pytest.fixture
+         def mock_memory():
+             memory = MagicMock()
+             memory.get_current_phase.return_value = "Context Gathering"
+             return memory
+         ```
+      
+      4. Include assertions that verify:
+         - State changes
+         - Function calls with correct parameters
+         - Return values
+         - Exception handling
+
+examples:
+  - input: |
+      def testPhaseChange(self):
+          controller = PhaseController(self.memory)
+          controller.moveToNextPhase()
+          self.assertEqual(controller.getCurrentPhase(), "Structure Development")
+    output: |
+      def test_phase_transition(self, memory_manager):
+          # Setup
+          controller = PhaseController(memory_manager)
+          initial_phase = controller.get_current_phase()
+          assert initial_phase == ContentPhase.CONTEXT_GATHERING
+          
+          # Action
+          result = controller.transition_to_next_phase()
+          
+          # Verification
+          assert result is True
+          assert controller.get_current_phase() == ContentPhase.STRUCTURE_DEVELOPMENT
+          memory_manager.transition_phase.assert_called_once_with("Structure Development")
+
+metadata:
+  priority: medium
+  version: 1.0
+</rule>

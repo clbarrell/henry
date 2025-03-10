@@ -1,0 +1,89 @@
+---
+description: Ensures consistent error handling throughout the application
+globs: *.py
+alwaysApply: false
+---
+<rule>
+name: error_handling_patterns
+description: Ensures consistent error handling throughout the application
+
+filters:
+  - type: file_path
+    pattern: "src/.*\\.py$"
+
+actions:
+  - type: lint
+    message: "Implement consistent error handling patterns"
+    conditions:
+      - pattern: "try:.*?except\\s+Exception.*?:"
+        negative: true
+        message: "Don't catch generic Exception; use specific exception types"
+      
+      - pattern: "self\\.logger\\.(?:error|warning|info|debug)\\("
+        positive: true
+        message: "Use proper logging for error conditions"
+
+  - type: suggest
+    conditions:
+      - pattern: "(?:try|except|raise)"
+    message: |
+      Follow these error handling patterns:
+      
+      1. Catch specific exceptions rather than generic ones:
+         ```python
+         try:
+             # Operation that might fail
+         except (ValueError, KeyError) as e:
+             # Handle specific errors
+         ```
+      
+      2. Log errors with context information:
+         ```python
+         try:
+             result = self.memory.add_section(title)
+         except neo4j.exceptions.Neo4jError as e:
+             self.logger.error(f"Failed to add section '{title}': {e}")
+             raise ContentCreationError(f"Database error: {e}") from e
+         ```
+      
+      3. Create custom exception types for domain-specific errors:
+         ```python
+         class ContentCreationError(Exception):
+             """Base exception for content creation errors."""
+             pass
+             
+         class PhaseTransitionError(ContentCreationError):
+             """Error during phase transition."""
+             pass
+         ```
+      
+      4. Handle errors at appropriate levels of abstraction:
+         - Low-level components: Raise specific exceptions
+         - Mid-level components: Transform to domain exceptions
+         - Interface level: Handle errors and present to user
+
+examples:
+  - input: |
+      def add_section(self, title):
+          try:
+              result = self.memory.add_section(title)
+              return result
+          except:
+              print("Error adding section")
+              return None
+    output: |
+      def add_section(self, title):
+          try:
+              result = self.memory.add_section(title)
+              return result
+          except neo4j.exceptions.Neo4jError as e:
+              self.logger.error(f"Failed to add section '{title}': {e}")
+              raise ContentCreationError(f"Could not add section: {e}") from e
+          except ValueError as e:
+              self.logger.warning(f"Invalid section title '{title}': {e}")
+              raise ContentCreationError(f"Invalid section title: {e}") from e
+
+metadata:
+  priority: high
+  version: 1.0
+</rule>

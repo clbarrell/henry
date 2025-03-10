@@ -1,0 +1,89 @@
+---
+description: Maintains consistency in phase transitions and phase-related logic
+globs: src/engine/phase\\.py$
+alwaysApply: false
+---
+<rule>
+name: phase_controller_consistency
+description: Maintains consistency in phase transitions and phase-related logic
+
+filters:
+  - type: file_path
+    pattern: "src/engine/phase\\.py$"
+
+actions:
+  - type: lint
+    message: "Maintain consistency in phase transitions and naming"
+    conditions:
+      - pattern: "ContentPhase\\.[A-Z_]+\\s*(?!==|!=|in)"
+        positive: true
+        message: "Always use ContentPhase enum for phase references"
+
+      - pattern: "transition_to_next_phase"
+        positive: true
+        message: "Use proper phase transition methods"
+
+  - type: suggest
+    conditions:
+      - pattern: "(?:current|next)_phase"
+    message: |
+      When working with the phase controller:
+      1. Use the ContentPhase enum for all phase references
+      2. Always validate phase transitions with proper checks
+      3. Keep phase names consistent between the enum and Neo4j
+      4. Document the transition logic clearly
+      5. Use descriptive messages for phase transitions
+      
+      Example phase transition pattern:
+      ```python
+      def transition_to_next_phase(self):
+          current_phase = self.get_current_phase()
+          
+          # Validate current phase has sufficient data
+          if not self._validate_phase_completion(current_phase):
+              return False
+              
+          # Determine next phase
+          if current_phase == ContentPhase.CONTEXT_GATHERING:
+              next_phase = ContentPhase.STRUCTURE_DEVELOPMENT
+          elif current_phase == ContentPhase.STRUCTURE_DEVELOPMENT:
+              next_phase = ContentPhase.CONTENT_DEVELOPMENT
+          else:
+              # Handle terminal phase
+              return False
+              
+          # Execute transition
+          phase_name = self.reverse_phase_map[next_phase]
+          self.memory.transition_phase(phase_name)
+          return True
+      ```
+
+examples:
+  - input: |
+      def move_phase(self):
+          phase = self.memory.get_current_phase()
+          if phase == "Context Gathering":
+              self.memory.transition_phase("Structure Development")
+          elif phase == "Structure Development":
+              self.memory.transition_phase("Content Development")
+    output: |
+      def transition_to_next_phase(self):
+          current_phase = self.get_current_phase()
+          
+          if current_phase == ContentPhase.CONTEXT_GATHERING:
+              next_phase = ContentPhase.STRUCTURE_DEVELOPMENT
+          elif current_phase == ContentPhase.STRUCTURE_DEVELOPMENT:
+              next_phase = ContentPhase.CONTENT_DEVELOPMENT
+          else:
+              self.logger.warning("Already in the final phase or unknown phase")
+              return False
+          
+          phase_name = self.reverse_phase_map[next_phase]
+          self.memory.transition_phase(phase_name)
+          self.logger.info(f"Transitioned to phase: {phase_name}")
+          return True
+
+metadata:
+  priority: high
+  version: 1.0
+</rule>

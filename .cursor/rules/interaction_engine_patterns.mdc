@@ -1,0 +1,84 @@
+---
+description: Maintains consistency in handling user interaction and questions
+globs: *interaction.py
+alwaysApply: false
+---
+<rule>
+name: interaction_engine_patterns
+description: Maintains consistency in handling user interaction and questions
+
+filters:
+  - type: file_path
+    pattern: "src/engine/interaction\\.py$"
+
+actions:
+  - type: lint
+    message: "Follow consistent patterns for user input processing and question generation"
+    conditions:
+      - pattern: "def\\s+process_user_input"
+        positive: true
+        message: "Implement process_user_input method for handling user inputs"
+        
+      - pattern: "self\\.memory\\.add_user_input\\("
+        positive: true
+        message: "Always store user inputs in the memory system"
+
+  - type: suggest
+    conditions:
+      - pattern: "(?:process|handle)_(?:user_input|command)"
+    message: |
+      When working with the interaction engine:
+      1. Always store user inputs with reference to the triggering question
+      2. Handle commands with a separate method
+      3. Process user input with these steps:
+         - Store input in memory
+         - Check for special commands
+         - Analyze input for phase transition readiness
+         - Generate an appropriate next question
+      4. Use consistent error handling
+      
+      Command processing pattern:
+      ```python
+      def _handle_command(self, command):
+          """Handle special commands."""
+          command = command.strip().lower()
+          
+          if command == '/help':
+              return self._generate_help_message()
+          elif command == '/status':
+              return self._generate_status_message()
+          # Handle other commands...
+          else:
+              return f"Unknown command: {command}. Type /help for available commands."
+      ```
+
+examples:
+  - input: |
+      def handle_input(self, text):
+          if text.startswith('/'):
+              # Handle command
+              pass
+          # Process regular input
+          return "Next question"
+    output: |
+      def process_user_input(self, text):
+          # Store the user input
+          input_id = self.memory.add_user_input(text, self.last_question_id)
+          self.logger.info(f"Stored user input: {text[:50]}...")
+          
+          # Check for commands
+          if text.startswith('/'):
+              return self._handle_command(text)
+          
+          # Check for phase transition readiness
+          if self._should_transition_phase(text):
+              self.phase_controller.transition_to_next_phase()
+              return "Moving to next phase.\n\n" + self.get_next_question()
+          
+          # Generate next question
+          return self.get_next_question()
+
+metadata:
+  priority: high
+  version: 1.0
+</rule>
