@@ -27,6 +27,8 @@ def main():
     setup_logging()
     logger = logging.getLogger(__name__)
 
+    memory = None  # Initialize to None for cleanup in finally block
+
     try:
         # Initialize components
         logger.info("Initializing memory manager...")
@@ -79,14 +81,24 @@ def main():
         logger.info(f"Starting console interface with LLM: {use_llm}...")
         console.start()
 
+    except KeyboardInterrupt:
+        # Handle Ctrl+C at the top level
+        logger.info("Application interrupted by user.")
+        print("\nApplication interrupted. Exiting gracefully...")
+
     except Exception as e:
         logger.error(f"Error in main application: {e}", exc_info=True)
+        print(f"\nAn error occurred: {e}")
 
     finally:
         # Clean up resources
         logger.info("Shutting down application...")
-        if "memory" in locals():
-            memory.close()
+        if memory:
+            try:
+                memory.close()
+                logger.info("Database connection closed.")
+            except Exception as e:
+                logger.error(f"Error closing database connection: {e}", exc_info=True)
 
 
 if __name__ == "__main__":

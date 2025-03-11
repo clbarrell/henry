@@ -32,13 +32,16 @@ class LLMClient:
             The complete response from the API
         """
         try:
-            # Clean messages to remove trailing whitespace
+            # Clean messages to remove trailing whitespace and filter out empty messages
             cleaned_messages = []
             for msg in messages:
                 cleaned_msg = msg.copy()
                 if "content" in cleaned_msg:
                     if isinstance(cleaned_msg["content"], str):
                         cleaned_msg["content"] = cleaned_msg["content"].strip()
+                        # Skip messages with empty content
+                        if not cleaned_msg["content"]:
+                            continue
                     elif isinstance(cleaned_msg["content"], list):
                         # Handle content that might be a list of content blocks
                         cleaned_content = []
@@ -51,6 +54,13 @@ class LLMClient:
                             cleaned_content.append(content_item)
                         cleaned_msg["content"] = cleaned_content
                 cleaned_messages.append(cleaned_msg)
+
+            # Ensure we have at least one message
+            if not cleaned_messages:
+                self.logger.warning(
+                    "No valid messages to send to API, adding default message"
+                )
+                cleaned_messages = [{"role": "user", "content": "Hello"}]
 
             # Clean system prompt if provided
             if system:

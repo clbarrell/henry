@@ -183,6 +183,94 @@ class MemoryManager:
             record = result.single()
             return record["phase_name"] if record else None
 
+    def list_sessions(self):
+        """List all available content sessions.
+
+        Returns:
+            List of dictionaries containing session information
+        """
+        with self.driver.session() as session:
+            result = session.run(
+                """
+                MATCH (c:Content)
+                OPTIONAL MATCH (c)-[:CURRENT_PHASE]->(p:Phase)
+                RETURN c.id as id, c.topic as topic, c.type as type, 
+                       c.created as created, p.name as current_phase
+                ORDER BY c.created DESC
+                """
+            )
+
+            sessions = []
+            for record in result:
+                sessions.append(
+                    {
+                        "id": record["id"],
+                        "topic": record["topic"],
+                        "type": record["type"],
+                        "created": record["created"],
+                        "current_phase": record["current_phase"],
+                    }
+                )
+
+            return sessions
+
+    def load_session(self, session_id):
+        """Load an existing session.
+
+        Args:
+            session_id: ID of the session to load
+
+        Returns:
+            Dictionary with session information or None if not found
+        """
+        with self.driver.session() as session:
+            # First get the session and phase info
+            result = session.run(
+                """
+                MATCH (c:Content {id: $session_id})
+                OPTIONAL MATCH (c)-[:CURRENT_PHASE]->(p:Phase)
+                RETURN c.id as content_id, c.topic as topic, c.type as type,
+                       p.id as phase_id, p.name as phase_name
+                """,
+                session_id=session_id,
+            )
+
+            record = result.single()
+            if not record:
+                return None
+
+            self.session_id = record["content_id"]
+            self.current_phase_id = record["phase_id"]
+
+            # Now get the last question if it exists
+            question_result = session.run(
+                """
+                MATCH (c:Content {id: $content_id})-[:HAS_QUESTION]->(q:Question)
+                RETURN q.id as question_id, q.text as question_text
+                ORDER BY q.timestamp DESC
+                LIMIT 1
+                """,
+                content_id=self.session_id,
+            )
+
+            question_record = question_result.single()
+
+            # Create the session data dictionary
+            session_data = {
+                "id": record["content_id"],
+                "topic": record["topic"],
+                "type": record["type"],
+                "phase_name": record["phase_name"],
+                "last_question_id": (
+                    question_record["question_id"] if question_record else None
+                ),
+                "last_question": (
+                    question_record["question_text"] if question_record else None
+                ),
+            }
+
+            return session_data
+
     def close(self):
         """Close the database connection."""
         self.driver.close()

@@ -337,6 +337,74 @@ class InteractionEngine:
 
         return formatted_welcome + first_question
 
+    def resume_session(self, session_id):
+        """Resume an existing content creation session.
+
+        Args:
+            session_id: ID of the session to resume
+
+        Returns:
+            Welcome message with the last question, or None if session not found
+        """
+        # Load the session from memory
+        session_data = self.memory.load_session(session_id)
+        if not session_data:
+            return None
+
+        # Update session ID
+        self.session_id = session_data["id"]
+        self.last_question_id = session_data.get("last_question_id")
+
+        # Reset agent state if using LLM
+        if self.use_llm:
+            self.agent_state.reset()
+            self.agent_state.session_id = self.session_id
+            self.agent_state.current_topic = session_data["topic"]
+            self.agent_state.content_type = session_data["type"]
+
+            # We would ideally load the conversation history here
+            # For now, we'll just add a message about resuming
+            self.agent_state.add_message(
+                "assistant",
+                f"Welcome back to your {session_data['type']} about {session_data['topic']}!",
+            )
+
+        welcome_message = (
+            f"Welcome back to your {session_data['type']} creation session about "
+            f"'[bold yellow]{session_data['topic']}[/bold yellow]'!\n\n"
+            f"You were in the [bold cyan]{session_data['phase_name']}[/bold cyan] phase.\n\n"
+        )
+
+        # Check if we have a valid last question, otherwise generate a new one
+        if not session_data.get("last_question"):
+            # Generate a new question
+            last_question = self.get_next_question()
+
+            # Add the new question to agent state if using LLM
+            if self.use_llm:
+                # Strip Rich markup for the agent state
+                plain_question = last_question.replace("[bold green]", "").replace(
+                    "[/bold green]", ""
+                )
+                plain_question = plain_question.replace("[white]", "").replace(
+                    "[/white]", ""
+                )
+                self.agent_state.add_message("assistant", plain_question)
+        else:
+            # Format the last question
+            last_question = f"[bold green]Question:[/bold green] [white]{session_data['last_question']}[/white]"
+
+            # Add the last question to agent state if using LLM
+            if self.use_llm:
+                self.agent_state.add_message("assistant", session_data["last_question"])
+
+        # Format the welcome message with Rich styling
+        formatted_welcome = (
+            f"[bold blue]Session Resumed![/bold blue]\n\n{welcome_message}"
+        )
+
+        return formatted_welcome + last_question
+
     def display_message(self, message, style="info"):
         """Display a message with Rich styling."""
         if style == "info":

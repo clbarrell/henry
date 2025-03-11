@@ -4,6 +4,8 @@ from rich.console import Console
 from rich.prompt import Prompt
 import questionary
 from questionary import Style as QuestionaryStyle
+import signal
+from datetime import datetime
 
 
 class ConsoleInterface:
@@ -37,18 +39,96 @@ class ConsoleInterface:
         self.console.print("[bold]Welcome to the Content Creation AI Agent![/bold]")
         self.console.print("Type [italic]'exit'[/italic] to quit at any time.")
 
-        while True:
-            if not self.session_active:
+        # Set up signal handler for graceful interruption
+        signal.signal(signal.SIGINT, self._handle_interrupt)
+
+        try:
+            while True:
+                if not self.session_active:
+                    self._choose_session()
+
+                try:
+                    user_input = Prompt.ask("\n[bold cyan]You[/bold cyan]")
+
+                    if user_input.lower() == "exit":
+                        self.console.print("[bold]Goodbye![/bold]")
+                        break
+
+                    response = self.interaction.process_user_input(user_input)
+                    self.console.print(f"\n[bold green]Agent[/bold green]: {response}")
+                except KeyboardInterrupt:
+                    # Handle Ctrl+C during input
+                    self._handle_interrupt(None, None)
+        except Exception as e:
+            self.logger.error(f"Error in console interface: {e}", exc_info=True)
+            self.console.print(f"[bold red]An error occurred: {e}[/bold red]")
+        finally:
+            # Clean up
+            self.console.print("[bold]Exiting...[/bold]")
+
+    def _handle_interrupt(self, sig, frame):
+        """Handle keyboard interruption (Ctrl+C)."""
+        self.console.print("\n\n[bold yellow]Session interrupted.[/bold yellow]")
+
+        try:
+            # Ask if user wants to save and exit
+            if questionary.confirm(
+                "Do you want to save your progress and exit?",
+                default=True,
+                style=self.custom_style,
+            ).ask():
+                self.console.print(
+                    "[bold green]Progress saved. You can resume this session later.[/bold green]"
+                )
+
+            self.console.print("[bold]Goodbye![/bold]")
+            # Exit gracefully
+            exit(0)
+        except Exception as e:
+            self.logger.error(f"Error handling interruption: {e}", exc_info=True)
+            exit(1)
+
+    def _choose_session(self):
+        """Choose between starting a new session or resuming an existing one."""
+        self.console.print("\n[bold]Choose an option:[/bold]")
+
+        # Get available sessions
+        sessions = self.interaction.memory.list_sessions()
+
+        # Create choices
+        choices = ["Start a new session"]
+
+        # Add existing sessions if available
+        session_map = {}
+        if sessions:
+            for session in sessions:
+                # Format the date
+                created_date = session["created"].strftime("%Y-%m-%d %H:%M")
+                choice_text = f"{session['topic']} ({session['type']}) - {created_date}"
+                choices.append(choice_text)
+                session_map[choice_text] = session["id"]
+
+        # Ask user to choose
+        choice = questionary.select(
+            "What would you like to do?", choices=choices, style=self.custom_style
+        ).ask()
+
+        if choice == "Start a new session":
+            self._setup_session()
+        else:
+            # Resume the selected session
+            session_id = session_map[choice]
+            welcome_message = self.interaction.resume_session(session_id)
+            if welcome_message:
+                self.console.print(
+                    f"\n[bold green]Agent[/bold green]: {welcome_message}"
+                )
+                self.session_active = True
+            else:
+                self.console.print(
+                    "[bold red]Failed to resume session. Starting a new one.[/bold red]"
+                )
                 self._setup_session()
-
-            user_input = Prompt.ask("\n[bold cyan]You[/bold cyan]")
-
-            if user_input.lower() == "exit":
-                self.console.print("[bold]Goodbye![/bold]")
-                break
-
-            response = self.interaction.process_user_input(user_input)
-            self.console.print(f"\n[bold green]Agent[/bold green]: {response}")
 
     def _setup_session(self):
         """Set up a new content creation session."""
